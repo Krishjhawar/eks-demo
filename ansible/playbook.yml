@@ -1,0 +1,191 @@
+---
+- name: Configure EKS environment and deploy application
+  hosts: jenkins
+  gather_facts: true
+
+  vars:
+    aws_region: "{{ lookup('env', 'AWS_REGION') | default('us-east-1') }}"
+    cluster_name: "{{ lookup('env', 'CLUSTER_NAME') | default('eks-demo') }}"
+    ecr_uri: "{{ lookup('env', 'ECR_URI') }}"
+    monitoring_namespace: monitoring
+    app_namespace: default
+    helm_version: "3.13.0"
+
+  tasks:
+
+    # ─── Prerequisites Check ──────────────────────────────────────────────
+    - name: Check AWS CLI is installed
+      command: aws --version
+      register: aws_cli_check
+      changed_when: false
+
+    - name: Check kubectl is installed
+      command: kubectl version --client
+      register: kubectl_check
+      changed_when: false
+
+    - name: Print AWS identity (confirms credentials work)
+      command: aws sts get-caller-identity
+      register: aws_identity
+      changed_when: false
+
+    - name: Show AWS identity
+      debug:
+        var: aws_identity.stdout
+
+    # ─── kubectl Configuration ────────────────────────────────────────────
+    - name: Update kubeconfig for EKS cluster
+      command: >
+        aws eks update-kubeconfig
+        --region {{ aws_region }}
+        --name {{ cluster_name }}
+      register: kubeconfig_result
+      changed_when: "'Added new context' in kubeconfig_result.stdout"
+
+    - name: Verify cluster connection
+      command: kubectl get nodes
+      register: nodes_output
+      changed_when: false
+
+    - name: Show cluster nodes
+      debug:
+        var: nodes_output.stdout_lines
+
+    # ─── Helm Installation ────────────────────────────────────────────────
+    - name: Check if Helm is installed
+      command: helm version --short
+      register: helm_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install Helm
+      shell: |
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      when: helm_check.rc != 0
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Verify Helm installation
+      command: helm version --short
+      changed_when: false
+
+    # ─── Helm Repositories ────────────────────────────────────────────────
+    - name: Add Prometheus community Helm repo
+      command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      register: prometheus_repo
+      changed_when: "'already exists' not in prometheus_repo.stderr"
+
+    - name: Add Grafana Helm repo
+      command: helm repo add grafana https://grafana.github.io/helm-charts
+      register: grafana_repo
+      changed_when: "'already exists' not in grafana_repo.stderr"
+
+    - name: Update all Helm repos
+      command: helm repo update
+
+    # ─── Monitoring Namespace ─────────────────────────────────────────────
+    - name: Create monitoring namespace
+      command: >
+        kubectl create namespace {{ monitoring_namespace }}
+        --dry-run=client -o yaml | kubectl apply -f -
+      changed_when: false
+
+    # ─── Prometheus Stack ─────────────────────────────────────────────────
+    - name: Install kube-prometheus-stack via Helm
+      command: >
+        helm upgrade --install prometheus
+        prometheus-community/kube-prometheus-stack
+        --namespace {{ monitoring_namespace }}
+        --values {{ playbook_dir }}/../monitoring/prometheus-values.yaml
+        --wait
+        --timeout 10m
+      register: prometheus_install
+
+    - name: Show Prometheus install result
+      debug:
+        var: prometheus_install.stdout_lines
+
+    # ─── Metrics Server (required for HPA) ───────────────────────────────
+    - name: Install metrics-server
+      command: >
+        helm upgrade --install metrics-server
+        metrics-server/metrics-server
+        --namespace kube-system
+        --set args[0]=--kubelet-insecure-tls
+        --wait
+      register: metrics_server
+
+    - name: Add metrics-server repo if needed
+      command: helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+      register: metrics_repo
+      changed_when: "'already exists' not in metrics_repo.stderr"
+      when: metrics_server.rc != 0
+
+    # ─── Deploy Application ───────────────────────────────────────────────
+    - name: Apply Kubernetes manifests
+      command: kubectl apply -f {{ playbook_dir }}/../k8s/
+      register: k8s_apply
+
+    - name: Show apply result
+      debug:
+        var: k8s_apply.stdout_lines
+
+    # ─── Wait for Deployment ──────────────────────────────────────────────
+    - name: Wait for demo-app deployment to be ready
+      command: >
+        kubectl rollout status deployment/demo-app
+        --namespace {{ app_namespace }}
+        --timeout=5m
+      register: rollout_status
+
+    - name: Show rollout status
+      debug:
+        var: rollout_status.stdout_lines
+
+    # ─── Verify HPA ───────────────────────────────────────────────────────
+    - name: Check HPA status
+      command: kubectl get hpa -n {{ app_namespace }}
+      register: hpa_status
+      changed_when: false
+
+    - name: Show HPA status
+      debug:
+        var: hpa_status.stdout_lines
+
+    # ─── Get App URL ──────────────────────────────────────────────────────
+    - name: Get LoadBalancer URL
+      command: >
+        kubectl get svc demo-app-service
+        -n {{ app_namespace }}
+        -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+      register: app_url
+      changed_when: false
+      retries: 10
+      delay: 15
+      until: app_url.stdout != ""
+
+    - name: Get Grafana URL
+      command: >
+        kubectl get svc prometheus-grafana
+        -n {{ monitoring_namespace }}
+        -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+      register: grafana_url
+      changed_when: false
+      ignore_errors: true
+
+    # ─── Final Summary ────────────────────────────────────────────────────
+    - name: Print deployment summary
+      debug:
+        msg:
+          - "============================================"
+          - "  EKS Demo Deployment Complete!"
+          - "============================================"
+          - "  App URL     : http://{{ app_url.stdout }}"
+          - "  Grafana URL : http://{{ grafana_url.stdout }}"
+          - "  Grafana Login: admin / prom-operator"
+          - "  Cluster     : {{ cluster_name }}"
+          - "  Region      : {{ aws_region }}"
+          - "============================================"
+          - "  To watch HPA scaling:"
+          - "  kubectl get hpa -w"
+          - "============================================"

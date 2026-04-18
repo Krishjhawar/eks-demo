@@ -1,0 +1,118 @@
+# ─── Prometheus Stack Configuration ───────────────────────────────────────
+# Installed via Helm: prometheus-community/kube-prometheus-stack
+
+grafana:
+  enabled: true
+  adminPassword: "eks-demo-admin"   # 🔴 REPLACE with your own password
+
+  # Expose Grafana via LoadBalancer so you can open it in browser
+  service:
+    type: LoadBalancer
+    port: 80
+
+  # Pre-load our custom dashboard automatically
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: "default"
+        orgId: 1
+        folder: "EKS Demo"
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+  dashboardsConfigMaps:
+    default: "grafana-dashboards"
+
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s/"
+    auth.anonymous:
+      enabled: false
+
+prometheus:
+  enabled: true
+
+  service:
+    type: ClusterIP
+
+  prometheusSpec:
+    # How long to keep metrics data
+    retention: 24h
+    retentionSize: "5GB"
+
+    # Scrape interval
+    scrapeInterval: "15s"
+    evaluationInterval: "15s"
+
+    # Allow Prometheus to scrape all namespaces
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    # Extra scrape configs for our demo app
+    additionalScrapeConfigs:
+
+    # ── Scrape the demo app pods directly ─────────────────────────────
+    - job_name: "demo-app"
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ["default"]
+      relabel_configs:
+      # Only scrape pods with annotation prometheus.io/scrape: "true"
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: "true"
+      # Use the port from annotation prometheus.io/port
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: (.+)
+        replacement: "${1}"
+      - source_labels: [__address__,
+                        __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: "([^:]+)(?::\\d+)?;(\\d+)"
+        replacement: "$1:$2"
+        target_label: __address__
+      # Use the path from annotation prometheus.io/path
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      # Add pod name as label
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+      # Add namespace as label
+      - source_labels: [__meta_kubernetes_pod_namespace]
+        action: replace
+        target_label: namespace
+      # Add app label
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: replace
+        target_label: app
+
+    # ── Scrape Kubernetes nodes ────────────────────────────────────────
+    - job_name: "kubernetes-nodes"
+      kubernetes_sd_configs:
+      - role: node
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+
+# ─── AlertManager (disable for demo simplicity) ───────────────────────────
+alertmanager:
+  enabled: false
+
+# ─── Node Exporter (gives CPU/memory per node) ────────────────────────────
+nodeExporter:
+  enabled: true
+
+# ─── Kube State Metrics (gives pod counts etc) ────────────────────────────
+kubeStateMetrics:
+  enabled: true

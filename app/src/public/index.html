@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EKS Demo Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    header .badge {
+      background: #22c55e;
+      color: #fff;
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-weight: 500;
+    }
+
+    header .badge.warn {
+      background: #ef4444;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+
+    .card .label {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.5rem;
+    }
+
+    .card .value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .card .value.warn { color: #ef4444; }
+    .card .value.ok   { color: #22c55e; }
+    .card .value.info { color: #60a5fa; }
+    .card .value.small {
+      font-size: 1rem;
+      font-weight: 500;
+      color: #a78bfa;
+      word-break: break-all;
+    }
+
+    .section-title {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.75rem;
+    }
+
+    .controls {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .controls .row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .controls label {
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }
+
+    .controls input[type="range"] {
+      accent-color: #6366f1;
+      width: 160px;
+    }
+
+    .controls span.duration-val {
+      font-weight: 600;
+      color: #a78bfa;
+      min-width: 40px;
+    }
+
+    button {
+      padding: 0.6rem 1.4rem;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    button:active { transform: scale(0.97); }
+
+    #stressBtn {
+      background: #6366f1;
+      color: #fff;
+    }
+
+    #stressBtn:disabled {
+      background: #3f3f60;
+      cursor: not-allowed;
+    }
+
+    #stressBtn.stressing {
+      background: #ef4444;
+    }
+
+    .log-box {
+      background: #0d0f1a;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      height: 200px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+
+    .log-box .log-line { margin-bottom: 4px; }
+    .log-box .log-line.ok   { color: #22c55e; }
+    .log-box .log-line.warn { color: #ef4444; }
+    .log-box .log-line.info { color: #60a5fa; }
+
+    .user-bar {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .bar-track {
+      background: #2d3148;
+      border-radius: 999px;
+      height: 16px;
+      margin-top: 0.75rem;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: #22c55e;
+      transition: width 0.4s ease, background 0.4s ease;
+    }
+
+    .bar-fill.warn { background: #ef4444; }
+
+    footer {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: #4a5568;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>⚡ EKS Scaling Demo</h1>
+    <span class="badge" id="statusBadge">LIVE</span>
+  </header>
+
+  <!-- Metric Cards -->
+  <div class="grid">
+    <div class="card">
+      <div class="label">Active Users</div>
+      <div class="value ok" id="activeUsers">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Max Threshold</div>
+      <div class="value info" id="maxUsers">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Overloaded</div>
+      <div class="value ok" id="overloaded">NO</div>
+    </div>
+    <div class="card">
+      <div class="label">Pod Name</div>
+      <div class="value small" id="podName">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Uptime (s)</div>
+      <div class="value info" id="uptime">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Last Updated</div>
+      <div class="value small" id="timestamp">—</div>
+    </div>
+  </div>
+
+  <!-- User Load Bar -->
+  <div class="user-bar">
+    <div class="section-title">User Load — <span id="barLabel">0 / 3</span></div>
+    <div class="bar-track">
+      <div class="bar-fill" id="barFill" style="width: 0%"></div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="section-title">Simulate Load (triggers HPA)</div>
+    <div class="row">
+      <label>Duration:</label>
+      <input type="range" id="durationSlider" min="5" max="60" value="15"
+             oninput="document.getElementById('durationVal').textContent = this.value + 's'"/>
+      <span class="duration-val" id="durationVal">15s</span>
+      <button id="stressBtn" onclick="triggerStress()">🔥 Simulate Load</button>
+    </div>
+  </div>
+
+  <!-- Event Log -->
+  <div class="section-title">Event Log</div>
+  <div class="log-box" id="logBox"></div>
+
+  <footer>
+    EKS Demo · Prometheus + Grafana + HPA · spireMinds
+  </footer>
+
+<script>
+  const sessionKey = 'eks-demo-session';
+  let sessionId = localStorage.getItem(sessionKey) || '';
+
+  function log(msg, type = '') {
+    const box = document.getElementById('logBox');
+    const line = document.createElement('div');
+    const time = new Date().toLocaleTimeString();
+    line.className = `log-line ${type}`;
+    line.textContent = `[${time}] ${msg}`;
+    box.prepend(line);
+    if (box.children.length > 60) box.lastChild.remove();
+  }
+
+  async function fetchStatus() {
+    try {
+      const res = await fetch('/status', {
+        headers: { 'x-session-id': sessionId }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const newId = res.headers.get('x-session-id');
+      if (newId) {
+        sessionId = newId;
+        localStorage.setItem(sessionKey, newId);
+      }
+
+      const d = await res.json();
+
+      document.getElementById('activeUsers').textContent = d.activeUsers;
+      document.getElementById('activeUsers').className =
+        'value ' + (d.overloaded ? 'warn' : 'ok');
+
+      document.getElementById('maxUsers').textContent = d.maxUsers;
+      document.getElementById('overloaded').textContent = d.overloaded ? 'YES ⚠' : 'NO';
+      document.getElementById('overloaded').className =
+        'value ' + (d.overloaded ? 'warn' : 'ok');
+
+      document.getElementById('podName').textContent = d.podName;
+      document.getElementById('uptime').textContent = d.uptime;
+      document.getElementById('timestamp').textContent =
+        new Date(d.timestamp).toLocaleTimeString();
+
+      // User bar
+      const pct = Math.min((d.activeUsers / d.maxUsers) * 100, 100);
+      const fill = document.getElementById('barFill');
+      fill.style.width = pct + '%';
+      fill.className = 'bar-fill' + (d.overloaded ? ' warn' : '');
+      document.getElementById('barLabel').textContent =
+        `${d.activeUsers} / ${d.maxUsers}`;
+
+      // Badge
+      const badge = document.getElementById('statusBadge');
+      badge.textContent = d.overloaded ? 'OVERLOADED' : 'LIVE';
+      badge.className = 'badge' + (d.overloaded ? ' warn' : '');
+
+    } catch (e) {
+      log('Failed to fetch status: ' + e.message, 'warn');
+    }
+  }
+
+  async function triggerStress() {
+    const btn = document.getElementById('stressBtn');
+    const duration = parseInt(document.getElementById('durationSlider').value);
+
+    btn.disabled = true;
+    btn.classList.add('stressing');
+    btn.textContent = `⏳ Stressing (${duration}s)...`;
+    log(`Triggering CPU stress for ${duration}s`, 'warn');
+
+    try {
+      const res = await fetch('/stress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': sessionId
+        },
+        body: JSON.stringify({ duration })
+      });
+      const d = await res.json();
+      log(`Stress started on pod: ${d.pod}`, 'info');
+      log(`HPA should trigger if CPU > 50% — watch kubectl get hpa -w`, 'info');
+    } catch (e) {
+      log('Stress request failed: ' + e.message, 'warn');
+    }
+
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.classList.remove('stressing');
+      btn.textContent = '🔥 Simulate Load';
+      log('Stress period ended — watching for scale-down...', 'ok');
+    }, duration * 1000);
+  }
+
+  // Poll every 2 seconds
+  fetchStatus();
+  setInterval(fetchStatus, 2000);
+  log('Dashboard started — polling /status every 2s', 'info');
+</script>
+</body>
+</html>

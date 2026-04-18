@@ -1,0 +1,57 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: demo-app-hpa
+  namespace: default
+  labels:
+    app: demo-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: demo-app
+
+  # ── Pod replica range ──────────────────────────────────────────────────
+  minReplicas: 1    # always at least 1 pod running
+  maxReplicas: 10   # maximum pods during peak load
+
+  # ── Scaling metrics ────────────────────────────────────────────────────
+  metrics:
+
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type:               AverageValue
+        averageUtilization: 50    # scale up when CPU > 50%
+
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type:               AverageValue
+        averageUtilization: 70    # scale up when memory > 70%
+
+  # ── Scaling behaviour ──────────────────────────────────────────────────
+  behavior:
+
+    scaleUp:
+      stabilizationWindowSeconds: 30  # wait 30s before scaling up
+                                      # short window = fast demo response
+      policies:
+      - type:           Pods
+        value:          2             # add 2 pods at a time
+        periodSeconds:  30
+      - type:           Percent
+        value:          100           # or double current pod count
+        periodSeconds:  30
+      selectPolicy:     Max           # pick whichever adds more pods
+
+    scaleDown:
+      stabilizationWindowSeconds: 300  # wait 5 min before scaling down
+                                       # keeps pods visible during demo
+      policies:
+      - type:           Pods
+        value:          1              # remove 1 pod at a time
+        periodSeconds:  60
+      selectPolicy:     Min            # be conservative scaling down

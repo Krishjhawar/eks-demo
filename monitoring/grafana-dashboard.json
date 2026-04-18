@@ -1,0 +1,400 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "EKS Demo Dashboard - Pod Scaling, CPU, Active Users, HTTP Requests",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+
+    {
+      "id": 1,
+      "title": "Active Pod Count",
+      "description": "Number of running demo-app pods — watch this go up during stress test",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red",    "value": 7 }
+            ]
+          },
+          "mappings": [],
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "orientation": "auto",
+        "textMode":    "auto",
+        "colorMode":   "background",
+        "graphMode":   "area",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "expr":         "count(kube_pod_info{namespace=\"default\", pod=~\"demo-app.*\"})",
+          "legendFormat": "Pod Count",
+          "refId":        "A"
+        }
+      ]
+    },
+
+    {
+      "id": 2,
+      "title": "Active Users",
+      "description": "Number of active sessions tracked by the app",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "orange", "value": 3 },
+              { "color": "red",    "value": 6 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode":   "background",
+        "graphMode":   "area",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "expr":         "sum(app_active_users)",
+          "legendFormat": "Active Users",
+          "refId":        "A"
+        }
+      ]
+    },
+
+    {
+      "id": 3,
+      "title": "CPU Utilization per Pod (%)",
+      "description": "HPA triggers scale-up when this exceeds 50%",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "orange", "value": 50 },
+              { "color": "red",    "value": 80 }
+            ]
+          },
+          "unit": "percent",
+          "max":  100
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode":   "background",
+        "graphMode":   "area",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "expr":         "avg(rate(container_cpu_usage_seconds_total{namespace=\"default\", container=\"demo-app\"}[1m])) * 100",
+          "legendFormat": "CPU %",
+          "refId":        "A"
+        }
+      ]
+    },
+
+    {
+      "id": 4,
+      "title": "HPA Desired vs Current Replicas",
+      "description": "Shows HPA scaling decisions in real time",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "colorMode":   "background",
+        "graphMode":   "area",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "expr":         "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"default\", horizontalpodautoscaler=\"demo-app-hpa\"}",
+          "legendFormat": "Current Replicas",
+          "refId":        "A"
+        },
+        {
+          "expr":         "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"default\", horizontalpodautoscaler=\"demo-app-hpa\"}",
+          "legendFormat": "Desired Replicas",
+          "refId":        "B"
+        }
+      ]
+    },
+
+    {
+      "id": 5,
+      "title": "Pod Count Over Time",
+      "description": "Watch pods scale up and down during the demo",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth":   2,
+            "fillOpacity": 20,
+            "spanNulls":   false
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend":  { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr":         "count(kube_pod_info{namespace=\"default\", pod=~\"demo-app.*\"})",
+          "legendFormat": "Running Pods",
+          "refId":        "A"
+        },
+        {
+          "expr":         "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"default\", horizontalpodautoscaler=\"demo-app-hpa\"}",
+          "legendFormat": "HPA Desired",
+          "refId":        "B"
+        },
+        {
+          "expr":         "kube_horizontalpodautoscaler_spec_max_replicas{namespace=\"default\", horizontalpodautoscaler=\"demo-app-hpa\"}",
+          "legendFormat": "HPA Max",
+          "refId":        "C"
+        }
+      ]
+    },
+
+    {
+      "id": 6,
+      "title": "CPU Usage Over Time",
+      "description": "CPU % per pod — HPA threshold line at 50%",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth":   2,
+            "fillOpacity": 15
+          },
+          "unit": "percent",
+          "max":  100
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend":  { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr":         "avg(rate(container_cpu_usage_seconds_total{namespace=\"default\", container=\"demo-app\"}[1m])) * 100",
+          "legendFormat": "Avg CPU %",
+          "refId":        "A"
+        },
+        {
+          "expr":         "max(rate(container_cpu_usage_seconds_total{namespace=\"default\", container=\"demo-app\"}[1m])) * 100",
+          "legendFormat": "Max CPU %",
+          "refId":        "B"
+        }
+      ]
+    },
+
+    {
+      "id": 7,
+      "title": "Active Users Over Time",
+      "description": "Session count — crosses threshold of 3 to trigger overload state",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth":   2,
+            "fillOpacity": 20
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend":  { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr":         "sum(app_active_users)",
+          "legendFormat": "Active Users",
+          "refId":        "A"
+        }
+      ]
+    },
+
+    {
+      "id": 8,
+      "title": "HTTP Request Rate",
+      "description": "Requests per second hitting the demo app",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth":   2,
+            "fillOpacity": 15
+          },
+          "unit": "reqps"
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend":  { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr":         "sum(rate(app_http_requests_total[1m])) by (route)",
+          "legendFormat": "{{ route }}",
+          "refId":        "A"
+        }
+      ]
+    },
+
+    {
+      "id": 9,
+      "title": "Memory Usage per Pod",
+      "description": "Memory consumption across all demo-app pods",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth":   2,
+            "fillOpacity": 15
+          },
+          "unit": "bytes"
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend":  { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr":         "sum(container_memory_usage_bytes{namespace=\"default\", container=\"demo-app\"}) by (pod)",
+          "legendFormat": "{{ pod }}",
+          "refId":        "A"
+        }
+      ]
+    },
+
+    {
+      "id": 10,
+      "title": "CPU Stress Active",
+      "description": "1 = stress test running, 0 = idle — matches /stress endpoint",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "red",   "value": 1 }
+            ]
+          },
+          "custom": {
+            "lineWidth":   2,
+            "fillOpacity": 40
+          },
+          "unit":    "short",
+          "min":     0,
+          "max":     1,
+          "mappings": [
+            { "type": "value", "value": "0", "result": { "text": "IDLE" } },
+            { "type": "value", "value": "1", "result": { "text": "STRESSING" } }
+          ]
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend":  { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr":         "sum(app_cpu_stress_active)",
+          "legendFormat": "Stress Active",
+          "refId":        "A"
+        }
+      ]
+    }
+
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["eks", "kubernetes", "demo", "hpa"],
+  "templating": { "list": [] },
+  "time": {
+    "from": "now-15m",
+    "to":   "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "EKS Demo — Pod Scaling Dashboard",
+  "uid":  "eks-demo-dashboard",
+  "version": 1
+}

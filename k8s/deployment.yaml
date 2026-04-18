@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+  namespace: default
+  labels:
+    app: demo-app
+    version: "1.0"
+    managed-by: jenkins
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0       # zero downtime during updates
+  template:
+    metadata:
+      labels:
+        app: demo-app
+        version: "1.0"
+      annotations:
+        # These tell Prometheus to scrape this pod automatically
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "3000"
+        prometheus.io/path:   "/metrics"
+    spec:
+      containers:
+      - name: demo-app
+        image: REPLACE_WITH_ECR_URI/demo-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+
+        # ── Environment Variables ────────────────────────────────────────
+        env:
+        - name: PORT
+          value: "3000"
+        - name: NODE_ENV
+          value: "production"
+        - name: MAX_SESSIONS
+          value: "3"
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name   # pod name injected here
+
+        # ── Resource Limits (HPA targets these) ─────────────────────────
+        resources:
+          requests:
+            cpu:    "100m"     # 0.1 CPU — what pod asks for
+            memory: "128Mi"
+          limits:
+            cpu:    "500m"     # 0.5 CPU — HPA triggers at 50% of this
+            memory: "256Mi"
+
+        # ── Health Checks ────────────────────────────────────────────────
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds:       20
+          failureThreshold:    3
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds:       10
+          failureThreshold:    3
+
+        # ── Security Context ─────────────────────────────────────────────
+        securityContext:
+          runAsNonRoot:             true
+          runAsUser:                1001
+          readOnlyRootFilesystem:   false
+          allowPrivilegeEscalation: false
+
+      # ── Pod-level settings ───────────────────────────────────────────
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+
+      # Anti-affinity — spread pods across nodes for HA
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key:      app
+                  operator: In
+                  values:   ["demo-app"]
+              topologyKey: kubernetes.io/hostname

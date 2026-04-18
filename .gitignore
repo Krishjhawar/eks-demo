@@ -1,0 +1,1 @@
+git add .gitignore Jenkinsfile README.md ansible/ app/ k8s/ monitoring/ terraform/
