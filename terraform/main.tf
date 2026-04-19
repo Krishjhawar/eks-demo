@@ -72,6 +72,7 @@ module "eks" {
   # Allow public access to cluster endpoint (needed for kubectl from local)
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
+  cluster_enabled_log_types = []
 
   # Enable IRSA (IAM Roles for Service Accounts)
   enable_irsa = true
