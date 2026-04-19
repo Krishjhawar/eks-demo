@@ -60,10 +60,11 @@
 
     - name: Install Helm
       shell: |
-        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       when: helm_check.rc != 0
+      become: true
       args:
-        creates: /usr/local/bin/helm
+      creates: /usr/local/bin/helm
 
     - name: Verify Helm installation
       command: helm version --short
