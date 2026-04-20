@@ -3,14 +3,21 @@
 
 grafana:
   enabled: true
-  adminPassword: "eks-demo-admin"   # 🔴 REPLACE with your own password
+  adminPassword: "eks-demo-admin"
 
-  # Expose Grafana via LoadBalancer so you can open it in browser
   service:
     type: LoadBalancer
     port: 80
 
-  # Pre-load our custom dashboard automatically
+  # ✅ Added resource limits
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "150m"
+
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1
@@ -40,34 +47,33 @@ prometheus:
     type: ClusterIP
 
   prometheusSpec:
-    # How long to keep metrics data
     retention: 24h
     retentionSize: "5GB"
-
-    # Scrape interval
     scrapeInterval: "15s"
     evaluationInterval: "15s"
-
-    # Allow Prometheus to scrape all namespaces
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
 
-    # Extra scrape configs for our demo app
-    additionalScrapeConfigs:
+    # ✅ Added resource limits
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "300m"
 
-    # ── Scrape the demo app pods directly ─────────────────────────────
+    additionalScrapeConfigs:
     - job_name: "demo-app"
       kubernetes_sd_configs:
       - role: pod
         namespaces:
           names: ["default"]
       relabel_configs:
-      # Only scrape pods with annotation prometheus.io/scrape: "true"
       - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
         action: keep
         regex: "true"
-      # Use the port from annotation prometheus.io/port
       - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
         action: replace
         target_label: __address__
@@ -79,25 +85,20 @@ prometheus:
         regex: "([^:]+)(?::\\d+)?;(\\d+)"
         replacement: "$1:$2"
         target_label: __address__
-      # Use the path from annotation prometheus.io/path
       - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
         action: replace
         target_label: __metrics_path__
         regex: (.+)
-      # Add pod name as label
       - source_labels: [__meta_kubernetes_pod_name]
         action: replace
         target_label: pod
-      # Add namespace as label
       - source_labels: [__meta_kubernetes_pod_namespace]
         action: replace
         target_label: namespace
-      # Add app label
       - source_labels: [__meta_kubernetes_pod_label_app]
         action: replace
         target_label: app
 
-    # ── Scrape Kubernetes nodes ────────────────────────────────────────
     - job_name: "kubernetes-nodes"
       kubernetes_sd_configs:
       - role: node
@@ -105,14 +106,28 @@ prometheus:
       - action: labelmap
         regex: __meta_kubernetes_node_label_(.+)
 
-# ─── AlertManager (disable for demo simplicity) ───────────────────────────
+# ✅ alertmanager was disabled — just added resources block (won't be used but safe to have)
 alertmanager:
   enabled: false
 
-# ─── Node Exporter (gives CPU/memory per node) ────────────────────────────
+# ─── Disabled heavy control-plane components (not accessible in EKS anyway)
+# ✅ Added
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+
+# ✅ Added
+prometheusOperator:
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+
 nodeExporter:
   enabled: true
 
-# ─── Kube State Metrics (gives pod counts etc) ────────────────────────────
 kubeStateMetrics:
   enabled: true
