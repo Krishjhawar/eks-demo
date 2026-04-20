@@ -86,9 +86,12 @@
 
     # ─── Monitoring Namespace ─────────────────────────────────────────────
     - name: Create monitoring namespace
-      command: >
-        kubectl create namespace {{ monitoring_namespace }}
-        --dry-run=client -o yaml | kubectl apply -f -
+      command: kubectl create namespace {{ monitoring_namespace }} --dry-run=client -o yaml
+      register: ns_yaml
+      changed_when: false
+
+    - name: Apply monitoring namespace
+      shell: kubectl get namespace {{ monitoring_namespace }} || kubectl create namespace {{ monitoring_namespace }}
       changed_when: false
 
     # ─── Prometheus Stack ─────────────────────────────────────────────────
