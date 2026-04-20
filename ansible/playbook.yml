@@ -131,7 +131,7 @@
 
     - name: Show Prometheus install result
       debug:
-      var: prometheus_install.stdout_lines
+        var: prometheus_install.stdout_lines
 
 # ─── Grafana (lightweight) ────────────────────────────────────────────
     - name: Install Grafana only
@@ -150,7 +150,7 @@
 
     - name: Show Grafana install result
       debug:
-          var: grafana_install.stdout_lines
+        var: grafana_install.stdout_lines
 
     # ─── Deploy Application ───────────────────────────────────────────────
     - name: Apply Kubernetes manifests
