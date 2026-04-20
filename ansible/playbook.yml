@@ -102,7 +102,7 @@
         --namespace {{ monitoring_namespace }}
         --values {{ playbook_dir }}/../monitoring/prometheus-values.yaml
         --wait
-        --timeout 10m
+        --timeout 20m
       register: prometheus_install
 
     - name: Show Prometheus install result
@@ -110,6 +110,15 @@
         var: prometheus_install.stdout_lines
 
     # ─── Metrics Server (required for HPA) ───────────────────────────────
+    # ─── Metrics Server ───────────────────────────────────────────────────
+    - name: Add metrics-server repo
+      command: helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+      register: metrics_repo
+      changed_when: "'already exists' not in metrics_repo.stderr"
+
+    - name: Update Helm repos
+      command: helm repo update
+
     - name: Install metrics-server
       command: >
         helm upgrade --install metrics-server
@@ -117,13 +126,6 @@
         --namespace kube-system
         --set args[0]=--kubelet-insecure-tls
         --wait
-      register: metrics_server
-
-    - name: Add metrics-server repo if needed
-      command: helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
-      register: metrics_repo
-      changed_when: "'already exists' not in metrics_repo.stderr"
-      when: metrics_server.rc != 0
 
     # ─── Deploy Application ───────────────────────────────────────────────
     - name: Apply Kubernetes manifests
