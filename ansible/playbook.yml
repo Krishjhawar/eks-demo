@@ -94,23 +94,7 @@
       shell: kubectl get namespace {{ monitoring_namespace }} || kubectl create namespace {{ monitoring_namespace }}
       changed_when: false
 
-    # ─── Prometheus Stack ─────────────────────────────────────────────────
-    - name: Install kube-prometheus-stack via Helm
-      command: >
-        helm upgrade --install prometheus
-        prometheus-community/kube-prometheus-stack
-        --namespace {{ monitoring_namespace }}
-        --values {{ playbook_dir }}/../monitoring/prometheus-values.yaml
-        --wait
-        --timeout 20m
-      register: prometheus_install
-
-    - name: Show Prometheus install result
-      debug:
-        var: prometheus_install.stdout_lines
-
     # ─── Metrics Server (required for HPA) ───────────────────────────────
-    # ─── Metrics Server ───────────────────────────────────────────────────
     - name: Add metrics-server repo
       command: helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
       register: metrics_repo
@@ -126,6 +110,47 @@
         --namespace kube-system
         --set args[0]=--kubelet-insecure-tls
         --wait
+        --timeout 5m
+
+# ─── Prometheus (lightweight) ─────────────────────────────────────────
+    - name: Install Prometheus only
+      command: >
+        helm upgrade --install prometheus
+        prometheus-community/prometheus
+        --namespace {{ monitoring_namespace }}
+        --set server.resources.requests.memory=128Mi
+        --set server.resources.requests.cpu=50m
+        --set server.resources.limits.memory=256Mi
+        --set server.persistentVolume.enabled=false
+        --set alertmanager.enabled=false
+        --set prometheus-pushgateway.enabled=false
+        --set nodeExporter.enabled=false
+        --wait
+        --timeout 10m
+      register: prometheus_install
+
+    - name: Show Prometheus install result
+      debug:
+      var: prometheus_install.stdout_lines
+
+# ─── Grafana (lightweight) ────────────────────────────────────────────
+    - name: Install Grafana only
+      command: >
+        helm upgrade --install grafana
+        grafana/grafana
+        --namespace {{ monitoring_namespace }}
+        --set resources.requests.memory=64Mi
+        --set resources.requests.cpu=50m
+        --set resources.limits.memory=128Mi
+        --set service.type=LoadBalancer
+        --set adminPassword=eks-demo-admin
+        --wait
+        --timeout 5m
+      register: grafana_install
+
+    - name: Show Grafana install result
+      debug:
+          var: grafana_install.stdout_lines
 
     # ─── Deploy Application ───────────────────────────────────────────────
     - name: Apply Kubernetes manifests
