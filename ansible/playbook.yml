@@ -81,6 +81,11 @@
       register: grafana_repo
       changed_when: "'already exists' not in grafana_repo.stderr"
 
+    - name: Add metrics-server repo
+      command: helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+      register: metrics_repo
+      changed_when: "'already exists' not in metrics_repo.stderr"
+
     - name: Update all Helm repos
       command: helm repo update
 
@@ -95,14 +100,6 @@
       changed_when: false
 
     # ─── Metrics Server (required for HPA) ───────────────────────────────
-    - name: Add metrics-server repo
-      command: helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
-      register: metrics_repo
-      changed_when: "'already exists' not in metrics_repo.stderr"
-
-    - name: Update Helm repos
-      command: helm repo update
-
     - name: Install metrics-server
       command: >
         helm upgrade --install metrics-server
@@ -112,7 +109,7 @@
         --wait
         --timeout 5m
 
-# ─── Prometheus (lightweight) ─────────────────────────────────────────
+    # ─── Prometheus (lightweight) ─────────────────────────────────────────
     - name: Install Prometheus only
       command: >
         helm upgrade --install prometheus
@@ -133,7 +130,7 @@
       debug:
         var: prometheus_install.stdout_lines
 
-# ─── Grafana (lightweight) ────────────────────────────────────────────
+    # ─── Grafana (lightweight) ────────────────────────────────────────────
     - name: Install Grafana only
       command: >
         helm upgrade --install grafana
@@ -142,7 +139,8 @@
         --set resources.requests.memory=64Mi
         --set resources.requests.cpu=50m
         --set resources.limits.memory=128Mi
-        --set service.type=LoadBalancer
+        --set service.type=NodePort
+        --set service.nodePort=30030
         --set adminPassword=eks-demo-admin
         --wait
         --timeout 5m
@@ -184,25 +182,21 @@
         var: hpa_status.stdout_lines
 
     # ─── Get App URL ──────────────────────────────────────────────────────
-    - name: Get LoadBalancer URL
+    - name: Get Node External IP
       command: >
-        kubectl get svc demo-app-service
-        -n {{ app_namespace }}
-        -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-      register: app_url
+        kubectl get nodes
+        -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}'
+      register: node_ip
       changed_when: false
-      retries: 10
-      delay: 15
-      until: app_url.stdout != ""
+      retries: 5
+      delay: 10
+      until: node_ip.stdout != ""
 
-    - name: Get Grafana URL
-      command: >
-        kubectl get svc prometheus-grafana
-        -n {{ monitoring_namespace }}
-        -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-      register: grafana_url
-      changed_when: false
-      ignore_errors: true
+    - name: Show access URLs
+      debug:
+        msg:
+          - "App URL     : http://{{ node_ip.stdout }}:30080"
+          - "Grafana URL : http://{{ node_ip.stdout }}:30030"
 
     # ─── Final Summary ────────────────────────────────────────────────────
     - name: Print deployment summary
@@ -211,9 +205,9 @@
           - "============================================"
           - "  EKS Demo Deployment Complete!"
           - "============================================"
-          - "  App URL     : http://{{ app_url.stdout }}"
-          - "  Grafana URL : http://{{ grafana_url.stdout }}"
-          - "  Grafana Login: admin / prom-operator"
+          - "  App URL     : http://{{ node_ip.stdout }}:30080"
+          - "  Grafana URL : http://{{ node_ip.stdout }}:30030"
+          - "  Grafana Login: admin / eks-demo-admin"
           - "  Cluster     : {{ cluster_name }}"
           - "  Region      : {{ aws_region }}"
           - "============================================"

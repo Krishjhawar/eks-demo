@@ -15,11 +15,12 @@ metadata:
     prometheus.io/port:   "3000"
     prometheus.io/path:   "/metrics"
 spec:
-  type: LoadBalancer
+  type: NodePort              # exposes service on each node's IP at a static port
   selector:
     app: demo-app        # matches pods with this label
   ports:
   - name:       http
     protocol:   TCP
     port:       80       # external port (what your friends open)
-    targetPort: 3000     # internal pod port
+    targetPort: 3000
+    nodePort:   30080    # internal pod port
