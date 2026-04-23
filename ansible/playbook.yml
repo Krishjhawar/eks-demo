@@ -201,16 +201,13 @@
     # ─── Final Summary ────────────────────────────────────────────────────
     - name: Print deployment summary
       debug:
-        msg:
-          - "============================================"
-          - "  EKS Demo Deployment Complete!"
-          - "============================================"
-          - "  App URL     : http://{{ node_ip.stdout }}:30080"
-          - "  Grafana URL : http://{{ node_ip.stdout }}:30030"
-          - "  Grafana Login: admin / eks-demo-admin"
-          - "  Cluster     : {{ cluster_name }}"
-          - "  Region      : {{ aws_region }}"
-          - "============================================"
-          - "  To watch HPA scaling:"
-          - "  kubectl get hpa -w"
-          - "============================================"
+      msg:
+      - "============================================"
+      - "  EKS Demo Deployment Complete!"
+      - "============================================"
+      - "  Run on Jenkins EC2 to access app:"
+      - "  kubectl port-forward svc/demo-app-service 8081:80 --address 0.0.0.0 &"
+      - "  kubectl port-forward svc/grafana 3000:80 -n monitoring --address 0.0.0.0 &"
+      - "  Cluster : {{ cluster_name }}"
+      - "  Region  : {{ aws_region }}"
+      - "============================================"
