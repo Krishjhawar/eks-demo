@@ -23,7 +23,3 @@ spec:
     protocol:   TCP
     port:       80       # external port (what your friends open)
     targetPort: 3000     # internal pod port
-  sessionAffinity: ClientIP  # same user hits same pod during demo
-  sessionAffinityConfig:
-    clientIP:
-      timeoutSeconds: 120
