@@ -181,33 +181,21 @@
       debug:
         var: hpa_status.stdout_lines
 
-    # ─── Get App URL ──────────────────────────────────────────────────────
-    - name: Get Node External IP
-      command: >
-        kubectl get nodes
-        -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}'
-      register: node_ip
-      changed_when: false
-      retries: 5
-      delay: 10
-      until: node_ip.stdout != ""
-
-    - name: Show access URLs
-      debug:
-        msg:
-          - "App URL     : http://{{ node_ip.stdout }}:30080"
-          - "Grafana URL : http://{{ node_ip.stdout }}:30030"
-
     # ─── Final Summary ────────────────────────────────────────────────────
     - name: Print deployment summary
       debug:
-      msg:
-      - "============================================"
-      - "  EKS Demo Deployment Complete!"
-      - "============================================"
-      - "  Run on Jenkins EC2 to access app:"
-      - "  kubectl port-forward svc/demo-app-service 8081:80 --address 0.0.0.0 &"
-      - "  kubectl port-forward svc/grafana 3000:80 -n monitoring --address 0.0.0.0 &"
-      - "  Cluster : {{ cluster_name }}"
-      - "  Region  : {{ aws_region }}"
-      - "============================================"
+        msg:
+          - "============================================"
+          - "  EKS Demo Deployment Complete!"
+          - "============================================"
+          - "  Run on Jenkins EC2 to access app:"
+          - "  kubectl port-forward svc/demo-app-service 8081:80 --address 0.0.0.0 &"
+          - "  kubectl port-forward svc/grafana 3000:80 -n monitoring --address 0.0.0.0 &"
+          - "  kubectl port-forward svc/prometheus-server 9090:80 -n monitoring --address 0.0.0.0 &"
+          - "  App URL      : http://JENKINS_IP:8081"
+          - "  Grafana URL  : http://JENKINS_IP:3000"
+          - "  Prometheus   : http://JENKINS_IP:9090"
+          - "  Grafana Login: admin / eks-demo-admin"
+          - "  Cluster      : {{ cluster_name }}"
+          - "  Region       : {{ aws_region }}"
+          - "============================================"
