@@ -1,6 +1,6 @@
 # EKS Demo Project — Kubernetes Scaling with Prometheus & Grafana
 
-> DevOps Subject Project | spireMinds | 2024-25
+> DevOps Subject Project
 
 
 ## Project Architecture
